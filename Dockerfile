@@ -1,84 +1,54 @@
-FROM php:8.2-fpm
+FROM php:8.2-apache
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
     curl \
     libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
     libonig-dev \
     libxml2-dev \
     libzip-dev \
     zip \
     unzip \
     nodejs \
-    npm
+    npm \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions termasuk GD
+# Config GD dulu sebelum install
+RUN docker-php-ext-configure gd \
+    --with-freetype \
+    --with-jpeg
+
+# Install PHP extensions
 RUN docker-php-ext-install \
     pdo \
     pdo_mysql \
     mbstring \
-    xml \
-    zip \
+    exif \
+    pcntl \
     bcmath \
-    tokenizer \
-    gd
+    gd \
+    zip
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-WORKDIR /var/www
+WORKDIR /var/www/html
 
 COPY . .
 
-# Install dependencies
+# Install PHP & JS dependencies
 RUN composer install --optimize-autoloader --no-scripts --no-interaction
 RUN npm install && npm run build
 
-# Set permissions
-RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
-
-EXPOSE $PORT
-
-CMD php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=$PORTFROM php:8.2-fpm
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    libzip-dev \
-    zip \
-    unzip \
-    nodejs \
-    npm
-
-# Install PHP extensions termasuk GD
-RUN docker-php-ext-install \
-    pdo \
-    pdo_mysql \
-    mbstring \
-    xml \
-    zip \
-    bcmath \
-    tokenizer \
-    gd
-
-# Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-WORKDIR /var/www
-
-COPY . .
-
-# Install dependencies
-RUN composer install --optimize-autoloader --no-scripts --no-interaction
-RUN npm install && npm run build
-
-# Set permissions
-RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
+# Laravel permissions
+RUN chown -R www-data:www-data /var/www/html/storage \
+    && chown -R www-data:www-data /var/www/html/bootstrap/cache \
+    && chmod -R 775 /var/www/html/storage \
+    && chmod -R 775 /var/www/html/bootstrap/cache
 
 EXPOSE $PORT
 
